@@ -19,7 +19,7 @@ def call(path, key, body=None, method=None):
                                  headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
                                  method=method or ("POST" if body is not None else "GET"))
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with urllib.request.urlopen(req, timeout=240) as r:
             return r.status, json.load(r), dict(r.headers)
     except urllib.error.HTTPError as e:
         return e.code, (e.read() or b"{}").decode()[:300], {}

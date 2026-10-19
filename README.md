@@ -25,11 +25,25 @@ Ask for a **capability**, never a vendor model:
 | `long-context` | big inputs | 2 models |
 | `embed` | embeddings (`/v1/embeddings`) | 2 models |
 
+Current models (NVIDIA free tier, probed live 2026-10-19 — order may change after the bake-off, ADR 0002):
+
+| Capability | 1st | 2nd | 3rd |
+|---|---|---|---|
+| `fast-json` | nemotron-3.5-lightning-30b-a3b (thinking off) | gemma-4-31b-it | gpt-oss-20b |
+| `general` | gpt-oss-20b | gemma-4-31b-it | |
+| `reasoning` | nemotron-3-super-120b-a12b | glm-5.3 | |
+| `long-context` | glm-5.3 | nemotron-3-super-120b-a12b | |
+| `embed` (2048-dim) | nemotron-3-embed-1b | llama-nemotron-embed-vl-1b-v2 | |
+
+Live status: `ops/smoke.sh --live` → SMOKE-OK (2026-10-19); typical latency 0.5–3 s, occasionally 10–20 s (NVIDIA queue).
+
 The response's `model` field says which model actually answered. Examples: `examples/` (curl, Python,
 Node, OpenCode). Any OpenAI-compatible SDK or tool works — that is the whole client contract.
 
 **Your project is responsible for:** what data it sends (no personal data to free providers), validating
 answers, and behaving well when the gateway or every provider is down (degrade, never block).
+Give `max_tokens` room (≥ 800 on `general`/`reasoning`): reasoning models think first, and a small limit returns
+**empty** content.
 
 ## Projects
 | Project | Namespace / Secret | Capabilities | Limit | Budget | Uses |

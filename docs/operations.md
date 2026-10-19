@@ -21,6 +21,15 @@
   why chains are `<cap>` → `<cap>.2` → `<cap>.3`.
 - NVIDIA's free-tier limit is per account; per-deployment `rpm` values must sum to ≤ 30 (tested).
 - `--num_workers 1`: rate limits and cooldowns are in-process; more workers would need Redis to share them.
+- **"Function '…': Not found for account"** (404) — many models in NVIDIA's public catalogue are not enabled for a
+  given free account (2026-10-19: kimi-k2.6, mistral-*, gemma-3, several embedders). Probe with the real key before
+  adding a model; `ops/smoke.sh --live` catches a dead primary.
+- **Reasoning models eat `max_tokens`.** nemotron-3.5-lightning with 400 tokens returned `finish_reason=length` and
+  empty content (all spent on reasoning). `fast-json`'s primary therefore runs with
+  `extra_body: {chat_template_kwargs: {enable_thinking: false}}` (0.7 s, same answers); `/no_think` in the prompt and
+  `reasoning_effort: none` did NOT work. Clients still leave headroom for reasoning fallbacks.
+- Some models wrap JSON in a ```` ```json ```` block even with `response_format: json_object` (gemma-4) — clients strip fences.
+- Embeddings: NVIDIA's asymmetric embedders need `input_type` (set per deployment: `query`).
 - The salt key encrypts credentials stored in the DB — never rotate it casually (bootstrap keeps it).
 
 ## Recovery
