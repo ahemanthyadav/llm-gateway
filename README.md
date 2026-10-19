@@ -31,6 +31,11 @@ Node, OpenCode). Any OpenAI-compatible SDK or tool works — that is the whole c
 **Your project is responsible for:** what data it sends (no personal data to free providers), validating
 answers, and behaving well when the gateway or every provider is down (degrade, never block).
 
+## Projects
+| Project | Namespace / Secret | Capabilities | Limit | Budget | Uses |
+|---|---|---|---|---|---|
+| marketdata | `market-data/llm-gateway-key` | fast-json, general, embed | 10 req/min | $0 (free only) | ML-7a daily note, forgiving `/stock` lookup |
+
 ## Add a project
 ```bash
 ops/new-project.sh <project> <k8s-namespace> fast-json,general 10 0     # capabilities, req/min, $ budget (0 = free only)
