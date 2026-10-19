@@ -1,0 +1,89 @@
+# llm-gateway on the k3s cluster. Apply with ops/deploy.sh (it also builds the ConfigMap from
+# config/litellm.yaml and rolls the pod when the config changes). Secret `llm-gateway` is created
+# out-of-band by ops/bootstrap.sh — never in git.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llm
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-gateway
+  namespace: llm
+spec:
+  replicas: 1
+  strategy: {type: Recreate}          # single instance; avoids two pods running DB migrations at once
+  selector:
+    matchLabels: {app: llm-gateway}
+  template:
+    metadata:
+      labels: {app: llm-gateway}
+    spec:
+      # TX2: 7.7 GB RAM (Pis have 1 GB). Same node as TimescaleDB, which holds the gateway's database.
+      nodeSelector: {kubernetes.io/hostname: ahytx2-desktop}
+      tolerations:
+        - {key: gpu, operator: Equal, value: "true", effect: NoSchedule}
+      containers:
+        - name: gateway
+          # Official LiteLLM image (litellm-database variant, arm64), retagged locally — no registry
+          # (marketdata ADR 0004). Pinned: ghcr.io/berriai/litellm-database@sha256:80a12a210e66…, litellm 1.106.0.
+          image: local/litellm-database:1.106.0
+          imagePullPolicy: Never
+          args: ["--config", "/app/config/litellm.yaml", "--port", "4000", "--num_workers", "1"]
+          ports:
+            - {containerPort: 4000, name: http}
+          env:
+            - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: master-key}}}
+            - {name: LITELLM_SALT_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: salt-key}}}
+            - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: llm-gateway, key: database-url}}}
+            # Provider keys: optional, so the gateway runs (selftest, admin UI) before any key exists.
+            - {name: NVIDIA_NIM_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: nvidia-nim-api-key, optional: true}}}
+            - {name: LITELLM_TELEMETRY, value: "False"}
+            - {name: STORE_MODEL_IN_DB, value: "False"}
+          resources:
+            requests: {memory: 512Mi, cpu: 250m}
+            limits: {memory: 1280Mi, cpu: "1"}
+          startupProbe:                 # first boot runs the DB migrations
+            httpGet: {path: /health/liveliness, port: http}
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /health/readiness, port: http}
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health/liveliness, port: http}
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 4
+          volumeMounts:
+            - {name: config, mountPath: /app/config, readOnly: true}
+      volumes:
+        - name: config
+          configMap: {name: llm-gateway-config}
+---
+# In-cluster clients: http://llm-gateway.llm.svc.cluster.local:4000/v1
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-gateway
+  namespace: llm
+spec:
+  selector: {app: llm-gateway}
+  ports:
+    - {name: http, port: 4000, targetPort: http}
+---
+# Clients outside the cluster (workstation scripts, other machines on the LAN / tailnet):
+# http://<any-node>:30400/v1 — every request still needs a project key. CGNAT: nothing is
+# reachable from the internet.
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-gateway-nodeport
+  namespace: llm
+spec:
+  type: NodePort
+  selector: {app: llm-gateway}
+  ports:
+    - {name: http, port: 4000, targetPort: http, nodePort: 30400}

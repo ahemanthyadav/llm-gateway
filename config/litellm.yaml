@@ -1,0 +1,95 @@
+# llm-gateway — capability routing (LiteLLM proxy config). The single place that maps the
+# capability names clients use to concrete provider models. Clients NEVER name a vendor model.
+#
+# Capabilities (public contract — renaming one is a breaking change for every project):
+#   fast-json     short structured outputs (summaries, extraction) — cheap + quick
+#   general       everyday chat / writing
+#   reasoning     harder multi-step questions
+#   long-context  large inputs
+#   embed         embeddings
+#
+# Ordered failover: each capability is a group whose fallback chain is "<cap>.2", "<cap>.3"
+# (litellm_settings.fallbacks). Members of a chain come from DIFFERENT model families/providers.
+# NVIDIA models are PROVISIONAL until the bake-off with a real key (ADR 0002) — replace ids here only.
+#
+# NVIDIA free tier ≈ 40 requests/min per ACCOUNT across all models: the per-deployment rpm values
+# below must sum to ≤ 30 (headroom) — tests/test_config.py enforces it.
+#
+# Secrets: only `os.environ/NAME` references (env from Secret llm-gateway). Never a literal key.
+
+model_list:
+  # --- fast-json ------------------------------------------------------------------------------
+  - model_name: fast-json
+    litellm_params: {model: nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 6, timeout: 60}
+    model_info: {gw_family: nemotron, gw_provider: nvidia, gw_cost: free}
+  - model_name: fast-json.2
+    litellm_params: {model: nvidia_nim/google/gemma-4-31b-it, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 4, timeout: 60}
+    model_info: {gw_family: gemma, gw_provider: nvidia, gw_cost: free}
+  - model_name: fast-json.3
+    litellm_params: {model: nvidia_nim/nv-mistralai/mistral-nemo-12b-instruct, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 3, timeout: 60}
+    model_info: {gw_family: mistral, gw_provider: nvidia, gw_cost: free}
+
+  # --- general --------------------------------------------------------------------------------
+  - model_name: general
+    litellm_params: {model: nvidia_nim/z-ai/glm-5.3-flash, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 4, timeout: 90}
+    model_info: {gw_family: glm, gw_provider: nvidia, gw_cost: free}
+  - model_name: general.2
+    litellm_params: {model: nvidia_nim/deepseek-ai/deepseek-v4.1-flash, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 3, timeout: 90}
+    model_info: {gw_family: deepseek, gw_provider: nvidia, gw_cost: free}
+
+  # --- reasoning ------------------------------------------------------------------------------
+  - model_name: reasoning
+    litellm_params: {model: nvidia_nim/nvidia/nemotron-3-super-120b-a12b, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 2, timeout: 180}
+    model_info: {gw_family: nemotron, gw_provider: nvidia, gw_cost: free}
+  - model_name: reasoning.2
+    litellm_params: {model: nvidia_nim/z-ai/glm-5.3, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 2, timeout: 180}
+    model_info: {gw_family: glm, gw_provider: nvidia, gw_cost: free}
+
+  # --- long-context ---------------------------------------------------------------------------
+  - model_name: long-context
+    litellm_params: {model: nvidia_nim/moonshotai/kimi-k2.6, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 2, timeout: 240}
+    model_info: {gw_family: kimi, gw_provider: nvidia, gw_cost: free}
+  - model_name: long-context.2
+    litellm_params: {model: nvidia_nim/nvidia/nemotron-3-super-120b-a12b, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 1, timeout: 240}
+    model_info: {gw_family: nemotron, gw_provider: nvidia, gw_cost: free}
+
+  # --- embed ----------------------------------------------------------------------------------
+  - model_name: embed
+    litellm_params: {model: nvidia_nim/nvidia/nv-embedqa-mistral-7b-v2, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 2, timeout: 60}
+    model_info: {gw_family: mistral-embed, gw_provider: nvidia, gw_cost: free, mode: embedding}
+  - model_name: embed.2
+    litellm_params: {model: nvidia_nim/snowflake/arctic-embed-l, api_key: os.environ/NVIDIA_NIM_API_KEY, rpm: 1, timeout: 60}
+    model_info: {gw_family: arctic-embed, gw_provider: nvidia, gw_cost: free, mode: embedding}
+
+  # --- self-test (no provider, no key) — admin key only; proves routing in CI and in the cluster.
+  # `selftest` deliberately points at a closed local port so every call FAILS and must fall back
+  # to `selftest.2`, a canned mock response. ops/smoke.sh uses it.
+  - model_name: selftest
+    litellm_params: {model: openai/selftest-down, api_base: "http://127.0.0.1:9/v1", api_key: unused, timeout: 3}
+    model_info: {gw_family: none, gw_provider: none, gw_cost: test}
+  - model_name: selftest.2
+    litellm_params: {model: openai/selftest-mock, mock_response: "SELFTEST-FALLBACK-OK", api_key: unused}
+    model_info: {gw_family: mock, gw_provider: none, gw_cost: test}
+
+litellm_settings:
+  drop_params: true            # a provider that lacks an optional param must not fail the call
+  request_timeout: 240
+  num_retries: 2               # per group, on 429/5xx/timeout, before moving down the chain
+  fallbacks:
+    - fast-json: [fast-json.2, fast-json.3]
+    - general: [general.2, fast-json]
+    - reasoning: [reasoning.2, general]
+    - long-context: [long-context.2]
+    - embed: [embed.2]
+    - selftest: [selftest.2]
+
+router_settings:
+  routing_strategy: simple-shuffle
+  allowed_fails: 3             # failures per minute before a deployment is cooled down
+  cooldown_time: 300           # seconds a failing deployment is skipped
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  store_model_in_db: false     # routing lives in this file (git), not in the admin UI
+  disable_spend_logs: false    # per-project usage is a feature (README "Projects")

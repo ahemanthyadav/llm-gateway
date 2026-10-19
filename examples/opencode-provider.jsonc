@@ -1,0 +1,12 @@
+// OpenCode — add the gateway as an OpenAI-compatible provider (only once OpenCode is a gateway
+// project with its own key and limit; ADR 0001). Put in opencode.json(c); key via {env:...}.
+{
+  "provider": {
+    "llm-gateway": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Home LLM gateway",
+      "options": { "baseURL": "http://<node>:30400/v1", "apiKey": "{env:LLM_GATEWAY_KEY}" },
+      "models": { "general": { "name": "general" }, "reasoning": { "name": "reasoning" } }
+    }
+  }
+}
