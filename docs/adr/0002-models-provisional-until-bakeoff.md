@@ -14,8 +14,22 @@ the primary, the next two from other families the fallbacks. Model ids stay pinn
 
 ## Update 2026-10-19
 Key placed. A live probe replaced every model the account cannot reach (404 "not found for account") and set
-`enable_thinking: false` on the `fast-json` primary (see operations.md). `ops/smoke.sh --live` → SMOKE-OK. Quality order is
-still unmeasured: the bake-off (marketdata `manifests/llm/bakeoff.py`) decides it.
+`enable_thinking: false` on the `fast-json` primary (see operations.md). `ops/smoke.sh --live` → SMOKE-OK.
+
+## Bake-off result (2026-10-19, fast-json quality)
+10 trading days of marketdata facts × 5 candidate groups, scored by the client's full number+direction check:
+
+| group (model) | first-try pass | final pass | median latency |
+|---|---|---|---|
+| fast-json.2 (gemma-4-31b-it) | 100 % | 100 % | 11.7 s |
+| general.2 (gemma-4-31b-it) | 100 % | 100 % | 11.7 s |
+| general (gpt-oss-20b) | 100 % | 90 % | 9.9 s |
+| fast-json (nemotron-3.5-lightning, thinking off) | 90 % | 100 % | 1.8 s |
+| fast-json.3 (gpt-oss-20b) | 90 % | 90 % | 15.0 s |
+
+**Order kept as-is.** After the built-in retry the top four all reach 100 % final quality, and the current primary is
+~6× faster with no JSON-fence quirk; 10 runs is too small a sample to pay that latency for one first-try difference.
+Revisit only if narrative quality regresses; re-run the bake-off when a model is retired or added.
 
 ## Consequences
 - Until then failover works but the order is a guess. `ops/smoke.sh --live` proves reachability, not quality.
