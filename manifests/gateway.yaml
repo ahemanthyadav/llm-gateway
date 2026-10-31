@@ -44,6 +44,9 @@ spec:
             - {name: CLOUDFLARE_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: cloudflare-api-key, optional: true}}}
             - {name: GITHUB_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: github-api-key, optional: true}}}
             - {name: CEREBRAS_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: cerebras-api-key, optional: true}}}
+            - {name: OPENROUTER_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: openrouter-api-key, optional: true}}}
+            - {name: OLLAMA_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: ollama-api-key, optional: true}}}
+            - {name: OLLAMA_BASE_URL, valueFrom: {secretKeyRef: {name: llm-gateway, key: ollama-base-url, optional: true}}}
             - {name: LITELLM_TELEMETRY, value: "False"}
             - {name: STORE_MODEL_IN_DB, value: "False"}
           resources:

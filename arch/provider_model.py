@@ -39,6 +39,8 @@ class Provider(Enum):
     CEREBRAS = auto()      # Cerebras Inference (high-speed)
     OPENAI = auto()        # OpenAI (for compatibility layer)
     ANTHROPIC = auto()     # Anthropic Claude
+    OPENROUTER = auto()    # OpenRouter (model aggregator, many models one key)
+    OLLAMA = auto()        # Ollama (self-hosted local models)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -280,6 +282,126 @@ PROVIDER_MODELS: Dict[Provider, List[ProviderModelInfo]] = {
             description="Llama 3.2 11B Vision via GitHub Models",
         ),
     ],
+    # === OpenAI ===
+    Provider.OPENAI: [
+        ProviderModelInfo(
+            model_name="gpt-4o-mini",
+            display_name="GPT-4o Mini (OpenAI)",
+            capabilities={"fast-json", "general", "reasoning"},
+            provider=Provider.OPENAI,
+            cost_per_1k_tokens=0.00015,  # $0.15 per 1M input, $0.60 output
+            max_output_tokens=16384,
+            context_window=128000,
+            rpm_limit=500,  # OpenAI tier-dependent
+            tpms_limit=None,
+            description="OpenAI GPT-4o Mini, fast and cost-effective",
+        ),
+        ProviderModelInfo(
+            model_name="gpt-4o",
+            display_name="GPT-4o (OpenAI)",
+            capabilities={"reasoning", "general", "fast-json", "long-context"},
+            provider=Provider.OPENAI,
+            cost_per_1k_tokens=0.0025,  # $2.50 per 1M input, $10 output
+            max_output_tokens=16384,
+            context_window=128000,
+            rpm_limit=200,
+            tpms_limit=None,
+            description="OpenAI GPT-4o, high-quality reasoning",
+        ),
+    ],
+    # === Anthropic ===
+    Provider.ANTHROPIC: [
+        ProviderModelInfo(
+            model_name="claude-3-haiku",
+            display_name="Claude 3 Haiku (Anthropic)",
+            capabilities={"fast-json", "general"},
+            provider=Provider.ANTHROPIC,
+            cost_per_1k_tokens=0.00025,  # $0.25 per 1M input, $1.25 output
+            max_output_tokens=4096,
+            context_window=200000,
+            rpm_limit=1000,
+            tpms_limit=None,
+            description="Anthropic Claude 3 Haiku, fast and compact",
+        ),
+        ProviderModelInfo(
+            model_name="claude-3-sonnet",
+            display_name="Claude 3 Sonnet (Anthropic)",
+            capabilities={"reasoning", "general", "fast-json"},
+            provider=Provider.ANTHROPIC,
+            cost_per_1k_tokens=0.003,  # $3 per 1M input, $15 output
+            max_output_tokens=8192,
+            context_window=200000,
+            rpm_limit=500,
+            tpms_limit=None,
+            description="Anthropic Claude 3 Sonnet, balanced reasoning",
+        ),
+    ],
+    # === OpenRouter ===
+    Provider.OPENROUTER: [
+        ProviderModelInfo(
+            model_name="openrouter/meta-llama/llama-3.1-8b-instruct",
+            display_name="Llama 3.1 8B Instruct (OpenRouter)",
+            capabilities={"fast-json", "general"},
+            provider=Provider.OPENROUTER,
+            cost_per_1k_tokens=0.0001,  # varies by model
+            max_output_tokens=8192,
+            context_window=128000,
+            rpm_limit=1000,
+            tpms_limit=None,
+            description="OpenRouter — Llama 3.1 8B, aggregated pricing",
+        ),
+        ProviderModelInfo(
+            model_name="openrouter/mistralai/mistral-7b-instruct",
+            display_name="Mistral 7B Instruct (OpenRouter)",
+            capabilities={"fast-json", "general"},
+            provider=Provider.OPENROUTER,
+            cost_per_1k_tokens=0.00007,
+            max_output_tokens=8192,
+            context_window=32768,
+            rpm_limit=1000,
+            tpms_limit=None,
+            description="OpenRouter — Mistral 7B, low cost",
+        ),
+        ProviderModelInfo(
+            model_name="openrouter/anthropic/claude-3-haiku",
+            display_name="Claude 3 Haiku (OpenRouter)",
+            capabilities={"fast-json", "general"},
+            provider=Provider.OPENROUTER,
+            cost_per_1k_tokens=0.00025,
+            max_output_tokens=4096,
+            context_window=200000,
+            rpm_limit=1000,
+            tpms_limit=None,
+            description="OpenRouter — Claude 3 Haiku via aggregator",
+        ),
+    ],
+    # === Ollama ===
+    Provider.OLLAMA: [
+        ProviderModelInfo(
+            model_name="ollama/llama3.2",
+            display_name="Llama 3.2 (Ollama)",
+            capabilities={"fast-json", "general"},
+            provider=Provider.OLLAMA,
+            cost_per_1k_tokens=0.0,  # self-hosted, no API cost
+            max_output_tokens=4096,
+            context_window=128000,
+            rpm_limit=10000,  # limited by local hardware, not provider
+            tpms_limit=None,
+            description="Ollama — self-hosted Llama 3.2, zero API cost",
+        ),
+        ProviderModelInfo(
+            model_name="ollama/llama3.1",
+            display_name="Llama 3.1 (Ollama)",
+            capabilities={"general", "reasoning"},
+            provider=Provider.OLLAMA,
+            cost_per_1k_tokens=0.0,  # self-hosted
+            max_output_tokens=8192,
+            context_window=128000,
+            rpm_limit=10000,
+            tpms_limit=None,
+            description="Ollama — self-hosted Llama 3.1, zero API cost",
+        ),
+    ],
     # === Cerebras Inference ===
     Provider.CEREBRAS: [
         ProviderModelInfo(
@@ -322,6 +444,10 @@ CAPABILITY_PROVIDER_MAP: Dict[str, Set[Provider]] = {
         Provider.GROQ,
         Provider.CLOUDFLARE_WORKERS_AI,
         Provider.GITHUB_MODELS,
+        Provider.OPENAI,
+        Provider.ANTHROPIC,
+        Provider.OPENROUTER,
+        Provider.OLLAMA,
     },
     "general": {
         Provider.NVIDIA,
@@ -330,15 +456,25 @@ CAPABILITY_PROVIDER_MAP: Dict[str, Set[Provider]] = {
         Provider.CLOUDFLARE_WORKERS_AI,
         Provider.GITHUB_MODELS,
         Provider.CEREBRAS,
+        Provider.OPENAI,
+        Provider.ANTHROPIC,
+        Provider.OPENROUTER,
+        Provider.OLLAMA,
     },
     "reasoning": {
         Provider.NVIDIA,
         Provider.GOOGLE_GEMINI,
         Provider.CEREBRAS,
+        Provider.OPENAI,
+        Provider.ANTHROPIC,
+        Provider.OPENROUTER,
+        Provider.OLLAMA,
     },
     "long-context": {
         Provider.NVIDIA,
         Provider.GOOGLE_GEMINI,
+        Provider.OPENAI,
+        Provider.OPENROUTER,
     },
     "embed": {
         Provider.NVIDIA,

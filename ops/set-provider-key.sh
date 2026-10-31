@@ -43,7 +43,7 @@ kubectl -n llm patch secret llm-gateway --type merge -p "{\"data\":{\"$FIELD\":\
 kubectl -n llm rollout restart deployment/llm-gateway >/dev/null
 kubectl -n llm rollout status deployment/llm-gateway --timeout=600s
 # Map known provider fields for documentation
-KNOWN_FIELDS="nvidia-nim-api-key google-ai-key groq-api-key cloudflare-api-key github-api-key cerebras-api-key"
+KNOWN_FIELDS="nvidia-nim-api-key google-ai-key groq-api-key cloudflare-api-key github-api-key cerebras-api-key openrouter-api-key ollama-api-key ollama-base-url"
 if echo " $KNOWN_FIELDS " | grep -q " $FIELD "; then
   echo "$FIELD set (value not shown); gateway restarted"
 else

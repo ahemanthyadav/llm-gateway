@@ -2,17 +2,20 @@
 
 ## Overview
 
-The llm-gateway supports 6 providers: NVIDIA, Google Gemini, Groq, Cloudflare Workers AI,
-GitHub Models, and Cerebras. The provider model catalog (`arch/provider_model.py`) defines
-18+ models with capabilities, costs, and rate limits. `config/litellm.yaml` is currently
-NVIDIA-only; this guide shows how to add non-NVIDIA providers.
+The llm-gateway supports 10 providers: NVIDIA, Google Gemini, Groq, Cloudflare Workers AI,
+GitHub Models, Cerebras, OpenAI, Anthropic, OpenRouter, and Ollama. The provider model
+catalog (`arch/provider_model.py`) defines 26+ models with capabilities, costs, and rate
+limits. `config/litellm.yaml` currently has NVIDIA models in active chains; non-NVIDIA
+models are defined but not in active fallback chains until you set keys and enable them.
 
 ## Prerequisites
 
 1. Provider API keys stored as secrets in Kubernetes (`Secret llm/llm-gateway`)
-2. Provider env vars wired into `manifests/gateway.yaml` (already done in this commit)
-3. Model entries in `config/litellm.yaml` (already added for Groq and Google Gemini)
-4. Fallback chain references uncommented in `config/litellm.yaml`
+2. Provider env vars wired into `manifests/gateway.yaml` (already done — includes NVIDIA,
+   Google AI, Groq, Cloudflare, GitHub, Cerebras, OpenRouter, Ollama)
+3. Model entries in `config/litellm.yaml` (already added for Groq, Google Gemini,
+   OpenRouter, and Ollama)
+4. Fallback chain references added in `config/litellm.yaml` (see Step 2)
 
 ## Step 1: Add Provider Keys
 
@@ -31,6 +34,10 @@ ops/set-provider-key.sh github-api-key ../marketdata/.secrets.env GITHUB_API_KEY
 
 # Cerebras
 ops/set-provider-key.sh cerebras-api-key ../marketdata/.secrets.env CEREBRAS_API_KEY
+# OpenRouter
+ops/set-provider-key.sh openrouter-api-key ../marketdata/.secrets.env OPENROUTER_API_KEY
+# Ollama (base URL, not an API key)
+ops/set-provider-key.sh ollama-base-url ../marketdata/.secrets.env OLLAMA_BASE_URL
 ```
 
 Each command reads the key from a local env file (never printed), base64-encodes it,
@@ -44,9 +51,10 @@ in `litellm_settings.fallbacks`:
 
 ```yaml
 fallbacks:
-  - fast-json: [fast-json.2, fast-json.3, groq-mixtral]     # uncomment groq-mixtral
-  - general: [general.2, fast-json, gemini-flash]           # uncomment gemini-flash
-  - reasoning: [reasoning.2, general, gemini-pro]           # uncomment gemini-pro
+  - fast-json: [fast-json.2, fast-json.3, groq-mixtral, openrouter-llama-8b]
+  - general: [general.2, fast-json, gemini-flash, ollama-llama3.2]
+  - reasoning: [reasoning.2, general, gemini-pro, ollama-llama3.1]
+  - long-context: [long-context.2, gemini-pro]
 ```
 
 Then deploy:
@@ -62,17 +70,21 @@ Before adding a model to active fallbacks, probe it:
 ops/probe-models.sh --provider groq --models mixtral-8x7b-32768,llama3-8b-8192
 ops/probe-models.sh --provider google --models gemini-1.5-flash,gemini-1.5-pro \
   --key-field google-ai-key
+ops/probe-models.sh --provider openrouter --models meta-llama/llama-3.1-8b-instruct \
+  --key-field openrouter-api-key
+ops/probe-models.sh --provider ollama --models llama3.2,llama3.1 \
+  --key-field ollama-base-url
 ```
 
 ## Provider Capability Matrix
 
-| Capability | NVIDIA | Groq | Google Gemini | Cloudflare | GitHub | Cerebras |
-|------------|--------|------|---------------|------------|--------|----------|
-| fast-json  | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| general    | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| reasoning  | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ |
-| long-context | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| embed      | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Capability | NVIDIA | Groq | Google Gemini | Cloudflare | GitHub | Cerebras | OpenAI | Anthropic | OpenRouter | Ollama |
+|------------|--------|------|---------------|------------|--------|----------|--------|-----------|------------|--------|
+| fast-json  | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| general    | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| reasoning  | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| long-context | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| embed      | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ## Cost-Aware Selection
 
@@ -94,3 +106,14 @@ python3 arch/cost_estimator.py --capability reasoning --requests 500 --priority 
   (AGENTS.md rule #5). Budget enforcement is implemented in `arch/budget_enforcer.py`.
 - **Fallback diversification:** Cross-family diversification (ADR 0001) still applies —
   don't put two models from the same family in one chain unless necessary.
+- **OpenRouter:** One API key gives access to hundreds of models. Set
+  `openrouter-api-key` in the secret. Models are prefixed with `openrouter/` in the
+  `model` field. Pricing varies by model — check OpenRouter's pricing page before adding
+  to paid chains.
+- **Ollama:** Self-hosted, zero API cost. Set `ollama-base-url` (e.g.,
+  `http://ollama-service.ollama.svc.cluster.local:11434`) in the secret. Ollama models
+  don't need an API key — set `api_key: unused` in config. RPM limit is effectively
+  limited by your local hardware, not the provider.
+- **OpenAI / Anthropic:** Models are defined in the catalog but not yet added to
+  `config/litellm.yaml`. Add them following the same pattern as Groq/Gemini, then set
+  `openai-api-key` or `anthropic-api-key` via `ops/set-provider-key.sh`.

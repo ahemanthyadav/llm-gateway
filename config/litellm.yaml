@@ -97,6 +97,26 @@ model_list:
     litellm_params: {model: gemini/gemini-1.5-pro, api_key: os.environ/GOOGLE_AI_API_KEY, rpm: 2000, timeout: 120}
     model_info: {gw_family: gemini, gw_provider: google, gw_cost: paid}
 
+  # OpenRouter — model aggregator, one key for many models
+  - model_name: openrouter-llama-8b
+    litellm_params: {model: openrouter/meta-llama/llama-3.1-8b-instruct, api_key: os.environ/OPENROUTER_API_KEY, rpm: 1000, timeout: 60}
+    model_info: {gw_family: llama, gw_provider: openrouter, gw_cost: paid}
+  - model_name: openrouter-mistral-7b
+    litellm_params: {model: openrouter/mistralai/mistral-7b-instruct, api_key: os.environ/OPENROUTER_API_KEY, rpm: 1000, timeout: 60}
+    model_info: {gw_family: mistral, gw_provider: openrouter, gw_cost: paid}
+  - model_name: openrouter-claude-haiku
+    litellm_params: {model: openrouter/anthropic/claude-3-haiku, api_key: os.environ/OPENROUTER_API_KEY, rpm: 1000, timeout: 60}
+    model_info: {gw_family: claude, gw_provider: openrouter, gw_cost: paid}
+
+  # Ollama — self-hosted local models, zero API cost
+  # Requires OLLAMA_BASE_URL set in Secret llm-gateway (field: ollama-base-url)
+  - model_name: ollama-llama3.2
+    litellm_params: {model: ollama/llama3.2, api_base: os.environ/OLLAMA_BASE_URL, api_key: os.environ/OLLAMA_API_KEY, rpm: 10000, timeout: 120}
+    model_info: {gw_family: llama, gw_provider: ollama, gw_cost: free}
+  - model_name: ollama-llama3.1
+    litellm_params: {model: ollama/llama3.1, api_base: os.environ/OLLAMA_BASE_URL, api_key: os.environ/OLLAMA_API_KEY, rpm: 10000, timeout: 120}
+    model_info: {gw_family: llama, gw_provider: ollama, gw_cost: free}
+
 litellm_settings:
   drop_params: true            # a provider that lacks an optional param must not fail the call
   request_timeout: 240

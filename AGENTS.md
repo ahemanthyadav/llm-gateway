@@ -38,8 +38,8 @@ Shared LLM gateway (LiteLLM 1.106.0) for all home-lab projects. Read `README.md`
    - `deploy_project_key(key_config)`: simulates `/key/generate` API response.
 
 9. **`arch/provider_model.py`** — Multi-provider support structure:
-   - 6 providers: `NVIDIA`, `GOOGLE_GEMINI`, `GROQ`, `CLOUDFLARE_WORKERS_AI`, `GITHUB_MODELS`, `CEREBRAS`.
-   - 18+ models with `cost_per_1k_tokens`, `rpm_limit`, `context_window`, `capabilities`.
+   - 10 providers: `NVIDIA`, `GOOGLE_GEMINI`, `GROQ`, `CLOUDFLARE_WORKERS_AI`, `GITHUB_MODELS`, `CEREBRAS`, `OPENAI`, `ANTHROPIC`, `OPENROUTER`, `OLLAMA`.
+   - 26+ models with `cost_per_1k_tokens`, `rpm_limit`, `context_window`, `capabilities`.
    - `CAPABILITY_PROVIDER_MAP`: which providers support `fast-json`, `general`, `reasoning`, `long-context`, `embed`.
    - `SmartSelector.select_model(capability, key_rate_limits, key_budgets, task_priority)` → `(Provider, ProviderModelInfo)`.
    - `MultiProviderRouter`: manages per-key provider state, `select_model_for_capability(key_alias, capability)`.
@@ -59,7 +59,7 @@ Shared LLM gateway (LiteLLM 1.106.0) for all home-lab projects. Read `README.md`
 16. **`ops/rotate-keys.sh`** — Rotate a project key: revoke old key, project must re-run `new-project.sh`. Supports `--all` and `--dry-run`.
 
 17. **`ops/set-provider-key.sh`** — Enhanced: validates field name format, checks env file exists, supports known provider fields
-    (`nvidia-nim-api-key`, `google-ai-key`, `groq-api-key`, `cloudflare-api-key`, `github-api-key`, `cerebras-api-key`), restarts gateway.
+    (`nvidia-nim-api-key`, `google-ai-key`, `groq-api-key`, `cloudflare-api-key`, `github-api-key`, `cerebras-api-key`, `openrouter-api-key`, `ollama-base-url`), restarts gateway.
 
 18. **`ops/probe-models.sh`** — Probe provider models for 404 "not found for account" before adding to `config/litellm.yaml`.
 
