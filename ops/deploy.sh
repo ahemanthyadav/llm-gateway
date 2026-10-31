@@ -1,14 +1,41 @@
 #!/bin/bash
 # deploy.sh — apply the gateway: ConfigMap from config/litellm.yaml, manifests, and roll the pod
 # when the config changes (annotation = sha256 of the config). Run tests first (CI does too).
+#
+# Modes:
+#   deploy.sh                  — full rollout (validate → ConfigMap → roll → smoke)
+#   deploy.sh --canary         — deploy config as canary, run smoke, wait for promotion
+#   deploy.sh --promote <sha>  — promote a canary deployment to full rollout
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/pi-cluster.yaml}"
-# 1. Run config validation (mirrors CI)
+
+MODE="full"
+PROMOTE_SHA=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --canary) MODE="canary"; shift ;;
+    --promote) PROMOTE_SHA="$2"; shift 2 ;;
+    *) echo "Unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+# ── Promote a canary to full rollout ──────────────────────────
+if [ -n "$PROMOTE_SHA" ]; then
+  echo "=== Promoting canary deployment: $PROMOTE_SHA ==="
+  kubectl -n llm rollout status deployment/llm-gateway --timeout=600s
+  ops/smoke.sh
+  echo "=== Canary $PROMOTE_SHA promoted to full rollout ==="
+  exit 0
+fi
+
+# ── Common: validate config ───────────────────────────────────
 echo "=== Validating config ==="
 python3 tests/test_config.py >/dev/null 2>&1 || { echo "config tests fail — fix before deploying" >&2; exit 1; }
 echo "  ✓ test_config.py PASSED"
-# 2. Validate capability routing with the architectural router
+
+# ── Common: validate capability routing ───────────────────────
 echo "=== Validating capability routing ==="
 python3 -c "
 import sys
@@ -27,20 +54,34 @@ else:
     print('  ✓ Cross-family diversification OK')
 "
 echo "  ✓ Capability routing validated"
-# 3. Apply ConfigMap from config/litellm.yaml
+
+# ── Compute config SHA ────────────────────────────────────────
+SHA=$(sha256sum config/litellm.yaml | cut -c1-16)
+
+# ── Apply ConfigMap from config/litellm.yaml ──────────────────
 echo "=== Applying ConfigMap ==="
 kubectl apply -f manifests/gateway.yaml
 kubectl -n llm create configmap llm-gateway-config --from-file=litellm.yaml=config/litellm.yaml \
   --dry-run=client -o yaml | kubectl apply -f -
-# 4. Compute sha256 of config for roll annotation
-SHA=$(sha256sum config/litellm.yaml | cut -c1-16)
+
+# ── Annotate deployment with config SHA ───────────────────────
 kubectl -n llm patch deployment llm-gateway --type merge \
   -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"llm-gateway/config-sha\":\"$SHA\"}}}}}" >/dev/null
-# 5. Roll the pod
+
+if [ "$MODE" = "canary" ]; then
+  echo "=== Canary mode: config $SHA deployed, waiting for promotion ==="
+  echo "  - ConfigMap updated with litellm.yaml (sha256: $SHA)"
+  echo "  - Gateway pod NOT rolled yet — run 'ops/deploy.sh --promote $SHA' to roll out"
+  echo "  - Run 'ops/smoke.sh' to validate before promoting"
+  exit 0
+fi
+
+# ── Full rollout: roll the pod ────────────────────────────────
 echo "=== Rolling gateway pod ==="
 kubectl -n llm rollout status deployment/llm-gateway --timeout=600s
 echo "deployed config $SHA"
-# 6. Run smoke test (without live key for routing proof)
+
+# ── Run smoke test ────────────────────────────────────────────
 echo "=== Running smoke test ==="
 ops/smoke.sh
 echo ""

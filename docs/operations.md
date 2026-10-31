@@ -37,5 +37,36 @@
 - DB lost → keys/usage are gone; routing is unaffected (it lives in git). `ops/bootstrap.sh`, redeploy, re-run
   `ops/new-project.sh … --rotate` per project.
 - Image lost on the TX2 → `k3s ctr -n k8s.io images import <tarball above>`.
-- Backups: the `litellm` DB is **not** in marketdata's daily `pg-backup` (that dumps the `postgres` DB) — acceptable
-  (keys are re-creatable); add it if usage history starts to matter.
+- Backups: use `ops/backup-db.sh` to back up the `litellm` DB. It is **not** in marketdata's daily `pg-backup`
+  (that dumps the `postgres` DB). Schedule it as a cronjob if usage history matters.
+
+## Secret Rotation
+
+### Rotate a project key
+```bash
+# Revoke the old key
+ops/rotate-keys.sh <project> <k8s-namespace>
+
+# Re-create with new key (params must match original)
+ops/new-project.sh <project> <k8s-namespace> <caps> <rpm> [budget]
+```
+
+Clients using the old key get 401/403 immediately after `rotate-keys.sh`. Distribute the new key
+to clients (never printed by any script).
+
+### Rotate a provider key
+```bash
+# Update the key in the env file, then re-run set-provider-key.sh
+ops/set-provider-key.sh <field> <env-file> <VAR>
+```
+This patches the Kubernetes secret and restarts the gateway. The old key stops working after the
+pod rolls.
+
+### Rotate the master key / salt key
+These are created by `ops/bootstrap.sh` and stored in `Secret llm/llm-gateway`. The salt key
+**must never change** — it encrypts credentials in the DB. To rotate the master key:
+1. Generate a new master key
+2. Patch `Secret llm/llm-gateway` field `master-key`
+3. `kubectl -n llm rollout restart deployment/llm-gateway`
+4. All clients must re-authenticate with the new master key
+

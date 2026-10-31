@@ -75,6 +75,28 @@ model_list:
     litellm_params: {model: openai/selftest-mock, mock_response: "SELFTEST-FALLBACK-OK", api_key: unused}
     model_info: {gw_family: mock, gw_provider: none, gw_cost: test}
 
+  # --- non-NVIDIA providers (require provider keys via ops/set-provider-key.sh) ---
+  # These models are available but NOT in active fallback chains yet.
+  # Uncomment fallback references in litellm_settings.fallbacks after setting keys:
+  #   ops/set-provider-key.sh groq-api-key <env-file> GROQ_API_KEY
+  #   ops/set-provider-key.sh google-ai-key <env-file> GOOGLE_AI_API_KEY
+  #
+  # Groq — fast inference, generous free tier
+  - model_name: groq-mixtral
+    litellm_params: {model: groq/mixtral-8x7b-32768, api_key: os.environ/GROQ_API_KEY, rpm: 300, timeout: 30}
+    model_info: {gw_family: mixtral, gw_provider: groq, gw_cost: paid}
+  - model_name: groq-llama3-8b
+    litellm_params: {model: groq/llama3-8b-8192, api_key: os.environ/GROQ_API_KEY, rpm: 500, timeout: 30}
+    model_info: {gw_family: llama, gw_provider: groq, gw_cost: paid}
+
+  # Google Gemini — generous context window, paid after free tier
+  - model_name: gemini-flash
+    litellm_params: {model: gemini/gemini-1.5-flash, api_key: os.environ/GOOGLE_AI_API_KEY, rpm: 1000, timeout: 60}
+    model_info: {gw_family: gemini, gw_provider: google, gw_cost: paid}
+  - model_name: gemini-pro
+    litellm_params: {model: gemini/gemini-1.5-pro, api_key: os.environ/GOOGLE_AI_API_KEY, rpm: 2000, timeout: 120}
+    model_info: {gw_family: gemini, gw_provider: google, gw_cost: paid}
+
 litellm_settings:
   drop_params: true            # a provider that lacks an optional param must not fail the call
   request_timeout: 240
