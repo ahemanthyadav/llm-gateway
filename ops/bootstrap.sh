@@ -35,3 +35,19 @@ PGPW=$(kubectl -n market-data get secret timescaledb-auth -o jsonpath='{.data.pa
 } | kubectl -n market-data exec -i timescaledb-0 -- env PGPASSWORD="$PGPW" psql -U postgres -d postgres -q -v ON_ERROR_STOP=1
 unset DBPW PGPW
 echo "database litellm ready (owner litellm)"
+
+echo ""
+echo "=== Next Steps ==="
+echo "1. Add provider keys:  ops/set-provider-key.sh <field> <env-file> <VAR>"
+echo "   Supported fields: nvidia-nim-api-key, google-ai-key, groq-api-key,"
+echo "                     cloudflare-api-key, github-api-key, cerebras-api-key"
+echo ""
+echo "2. Add a new project:  ops/new-project.sh <project> <namespace> <caps> <rpm> [budget]"
+echo ""
+echo "3. Deploy config:  ops/deploy.sh"
+echo ""
+echo "4. Verify:  ops/smoke.sh"
+echo ""
+echo "5. Admin UI:  http://<node>:30400/ui  (login with master-key)"
+echo ""
+echo "6. Test config:  python3 tests/test_config.py"
