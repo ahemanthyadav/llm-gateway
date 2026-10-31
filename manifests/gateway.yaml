@@ -39,6 +39,11 @@ spec:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: llm-gateway, key: database-url}}}
             # Provider keys: optional, so the gateway runs (selftest, admin UI) before any key exists.
             - {name: NVIDIA_NIM_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: nvidia-nim-api-key, optional: true}}}
+            - {name: GOOGLE_AI_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: google-ai-key, optional: true}}}
+            - {name: GROQ_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: groq-api-key, optional: true}}}
+            - {name: CLOUDFLARE_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: cloudflare-api-key, optional: true}}}
+            - {name: GITHUB_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: github-api-key, optional: true}}}
+            - {name: CEREBRAS_API_KEY, valueFrom: {secretKeyRef: {name: llm-gateway, key: cerebras-api-key, optional: true}}}
             - {name: LITELLM_TELEMETRY, value: "False"}
             - {name: STORE_MODEL_IN_DB, value: "False"}
           resources:

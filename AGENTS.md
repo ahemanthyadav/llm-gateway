@@ -74,9 +74,24 @@ Shared LLM gateway (LiteLLM 1.106.0) for all home-lab projects. Read `README.md`
 | Quick RPM/budget test | `python3 -c "from arch.rpm_budget import RpmBudgetTracker, PerKeyRateLimiter, PerKeyBudget; ..."` |
 | Test key scoping | `python3 -c "from arch.project_key import ProjectKeyConfig, KeyScoper; ..."` |
 | Multi-provider selection | `python3 -c "from arch.provider_model import SmartSelector, Provider; ..."` |
+| Cost estimation | `python3 arch/cost_estimator.py --capability <cap> --requests <N> --priority <cost|speed|quality|balanced>` |
 | Full smoke test | `ops/smoke.sh` (or `ops/smoke.sh --live` for real provider calls) |
 | Deploy after changes | `ops/deploy.sh` |
 | Admin UI | `http://<node>:30400/ui` — login with master key from `Secret llm/llm-gateway` |
+
+## ⏳ Pending Tasks (see `TASKS.md` for full list)
+
+| # | Task | Status | Deps |
+|---|------|--------|------|
+| 1 | `ops/delete-project.sh` — revoke/delete a project key | ✅ done | none |
+| 2 | `ops/probe-models.sh` — probe model availability before adding to config | ✅ done | none |
+| 3 | `arch/cost_estimator.py` — CLI cost/RPM feasibility estimator | ✅ done | none |
+| 4 | Wire provider env vars into `manifests/gateway.yaml` | ✅ done | none |
+| 5 | Add non-NVIDIA models to `config/litellm.yaml` fallbacks | pending | provider keys set |
+| 6 | Budget enforcement at request time (402 over budget) | pending | LiteLLM middleware |
+| 7 | Prometheus metrics endpoint | pending | metrics integration |
+| 8 | Redis-backed state for multi-replica | pending | scaling need |
+
 
 ## 📦 What Was Just Deployed
 
